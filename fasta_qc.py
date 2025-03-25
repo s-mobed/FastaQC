@@ -1,11 +1,13 @@
 # IMPORTS
 import sys
 import os
+import traceback
+import datetime
 import pandas as pd
 import re
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QFont, QIcon, QClipboard, QBrush, QColor
-from PyQt5.QtWidgets import QApplication, QMainWindow, QListWidget, QLineEdit, QPushButton, QMessageBox, QLabel, QFileDialog, QRadioButton
+from PyQt5.QtWidgets import QApplication, QMainWindow, QListWidget, QLineEdit, QPushButton, QMessageBox, QLabel, QFileDialog, QRadioButton, QWidget, QVBoxLayout, QScrollArea
 from Bio import SeqIO
 from Bio.SeqIO.FastaIO import FastaWriter
 from Bio.SeqRecord import SeqRecord
@@ -22,28 +24,24 @@ from Bio.Seq import Seq
 
 # WIN Compile Command
 """
-nuitka --onefile --enable-plugins=pyqt5 --include-data-files=Logo.png=./Logo.png --include-data-files=Icon.ico=./Icon.ico --disable-console 
---windows-icon-from-ico=Icon.ico --company-name="Biosurv International" 
---product-name="FASTAQC" --file-version=1.0.0 
---file-description=="This App curates Fasta seqs to remove sequences that failed DDNS QC"  
+nuitka --onefile --enable-plugins=pyqt5 --include-data-files=psc_logo.png=./psc_logo.png --include-data-files=psc_logo.ico=./psc_logo.ico --disable-console --windows-icon-from-ico=psc_logo.ico --company-name="Biosurv International" --product-name="FASTAQC" --file-version=1.0.0 --file-description=="This App curates Fasta seqs to remove sequences that failed DDNS QC" fasta_qc.py
 """
 
 # BUILD PROGRESS
 """
-- make window with directory selection for piranha report 
-- make text box or selection box for sequences, perhaps tabs for sabins for quicker selection 
-- build logic that reads report and pre selects failed sequences 
-- save button will save to vp1 sequences with _QCPass tag 
+- make window with directory selection for piranha report X
+- make text box or selection box for sequences, perhaps tabs for sabins for quicker selection X
+- build logic that reads report and pre selects failed sequences X
+- save button will save to vp1 sequences with _QCPass tag X
 - make double click feature for failing samples in app, disabled in preference for in report changes - disabled feature, code commented out line 434 - 464
-- add option to choose between ddns and isolat 
-- add checks for is samples match between fasta and report, empty QC cells, if they try to generate fasta before parsing, file presence and handling checks 
-
-- show drop box bg label when done with testing
-
-- added version number in bottom righthand corner 
-- now removes non-polio seqs from output and non samples based of name regex
-- generate buttton is disabled until files parsed, colour set to darkgray
-- checks RunQC to fail samples
+- add option to choose between ddns and isolat X
+- add checks for is samples match between fasta and report, empty QC cells, if they try to generate fasta before parsing, file presence and handling checks X
+- show drop box bg label when done with testing X
+- added version number in bottom righthand corner X
+- now removes non-polio seqs from output and non samples based of name regex X
+- generate buttton is disabled until files parsed, colour set to darkgray X
+- checks RunQC to fail samples X
+- add catchall error handler that saves to downloads folder X
 """
 
 # APP
@@ -122,7 +120,7 @@ class App(QMainWindow):
         
         # ---- DESTINATION BOX ----
         self.destination_entry = QLineEdit(self)
-        self.destination_entry.setText("C:/Users/SheanMobed/OneDrive - Biosurv International/Desktop") # TEMP
+        # self.destination_entry.setText("C:/Users/SheanMobed/OneDrive - Biosurv International/Desktop") # TEMP
         self.destination_entry.setStyleSheet("background-color:#FAF9F6;border-color:lightgrey;border-style:dashed;border-width: 2px;border-radius: 10px;")
         self.destination_entry.setGeometry(int(screen_width * 0.13), int(screen_height * 0.27), int(screen_width * 0.8), int(screen_height * 0.04))
         self.destination_entry.setFont(QFont('Arial', 11))
@@ -137,8 +135,8 @@ class App(QMainWindow):
         self.listbox_view.setStyleSheet("background-color:#FAF9F6;border-color:lightgrey;border-style:dashed;border-width: 2px;border-radius: 10px;")
         self.listbox_view.setGeometry(int(screen_width * 0.13), int(screen_height * 0.19), int(screen_width * 0.8), int(screen_height * 0.08))
         
-        self.listbox_view.addItem('C:/Users/SheanMobed/Documents/Coding/Polio/DDNS_Polio/Final_Data/20240702_035_detailed_run_report.csv') # TEMP
-        self.listbox_view.addItem('C:/Users/SheanMobed/Documents/Coding/Polio/DDNS_Polio/Miscellaneous/2024/20240702_035/20240702_035_vp1_sequences.fasta')
+        # self.listbox_view.addItem('C:/Users/SheanMobed/Documents/Coding/Polio/DDNS_Polio/Final_Data/2024/20240702_035_detailed_run_report.csv') # TEMP
+        # self.listbox_view.addItem('C:/Users/SheanMobed/Documents/Coding/Polio/DDNS_Polio/Miscellaneous/2024/20240702_035/20240702_035_vp1_sequences.fasta')
         
         self.listbox_label = QLabel('Dropbox:', self)
         self.listbox_label.setStyleSheet("background-color:transparent")
@@ -549,6 +547,53 @@ class App(QMainWindow):
         
         
 if __name__ == '__main__':
+    
+     # Unexpected error catcher
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        
+        # exception and traceback
+        error_message = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+        
+        # seting window message with 500 tabs to make it longer
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setWindowTitle("An error occurred" + "  " * 500)
+        msg_box.setText(f"An unexpected error occurred:\n{str(exc_value)}\nLog saved to Downloads Folder!")
+
+        # create a scrollable traceback
+        scroll = QScrollArea(msg_box)
+        scroll.setWidgetResizable(True)
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        
+        # Add the traceback message in a QLabel and set it inside the scroll area
+        traceback_label = QLabel(error_message)
+        traceback_label.setWordWrap(True)
+        traceback_label.setStyleSheet("QLabel { font-size: 35px; }")  # Adjust font size here
+        scroll_layout.addWidget(traceback_label)
+        
+        scroll.setWidget(scroll_content)
+        
+        # adding scrollable traceback 
+        msg_box.layout().addWidget(scroll, 1, 0, 1, msg_box.layout().columnCount())
+        
+        msg_box.exec_()
+        
+        # Create a unique filename with the current date and time
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        log_filename = f"merger_app_error_log_{timestamp}.txt"
+        downloads_folder = os.path.join(os.path.expanduser("~"), "Downloads")
+        log_filepath = os.path.join(downloads_folder, log_filename)
+        
+        # Write the error message to the log file on the desktop
+        with open(log_filepath, "w") as f:
+            f.write(error_message)
+
+    # Set excepthook to custom one
+    sys.excepthook = handle_exception
     app = QApplication(sys.argv)
     prog = App()
     prog.show()
